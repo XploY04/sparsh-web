@@ -36,4 +36,5 @@ const ParticipantSchema = new mongoose.Schema(
 // Index for efficient queries
 ParticipantSchema.index({ trialId: 1, enrollmentDate: -1 });
 
-export default mongoose.models.Participant || mongoose.model("Participant", ParticipantSchema);
+export default mongoose.models.Participant ||
+  mongoose.model("Participant", ParticipantSchema);

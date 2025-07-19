@@ -67,7 +67,7 @@ export default function TrialDetailPage({ params }) {
   const enrollParticipant = async () => {
     setEnrolling(true);
     setError("");
-    
+
     try {
       const response = await fetch(`/api/trials/${trialId}/participants`, {
         method: "POST",
@@ -164,13 +164,19 @@ export default function TrialDetailPage({ params }) {
         >
           ← Back to Dashboard
         </button>
-        
+
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">{trial.title}</h1>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">
+              {trial.title}
+            </h1>
             <p className="text-gray-600 mb-4">{trial.description}</p>
             <div className="flex items-center gap-4">
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(trial.status)}`}>
+              <span
+                className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
+                  trial.status
+                )}`}
+              >
                 {trial.status.charAt(0).toUpperCase() + trial.status.slice(1)}
               </span>
               <span className="text-sm text-gray-600">
@@ -191,11 +197,13 @@ export default function TrialDetailPage({ params }) {
       {/* Control Panel */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Enrollment Controls</h2>
-        
+
         <div className="flex gap-4 flex-wrap">
           {/* Pause/Resume Button */}
           <button
-            onClick={() => updateTrialStatus(trial.status === "active" ? "paused" : "active")}
+            onClick={() =>
+              updateTrialStatus(trial.status === "active" ? "paused" : "active")
+            }
             disabled={updatingStatus || trial.status === "completed"}
             className={`px-4 py-2 rounded font-medium transition-colors ${
               trial.status === "active"
@@ -203,18 +211,21 @@ export default function TrialDetailPage({ params }) {
                 : "bg-green-600 hover:bg-green-700 text-white"
             } disabled:opacity-50 disabled:cursor-not-allowed`}
           >
-            {updatingStatus 
-              ? "Updating..." 
-              : trial.status === "active" 
-                ? "Pause Enrollment" 
-                : "Resume Enrollment"
-            }
+            {updatingStatus
+              ? "Updating..."
+              : trial.status === "active"
+              ? "Pause Enrollment"
+              : "Resume Enrollment"}
           </button>
 
           {/* Enroll Participant Button */}
           <button
             onClick={enrollParticipant}
-            disabled={enrolling || trial.status !== "active" || enrollmentStats.enrolled >= enrollmentStats.target}
+            disabled={
+              enrolling ||
+              trial.status !== "active" ||
+              enrollmentStats.enrolled >= enrollmentStats.target
+            }
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {enrolling ? "Enrolling..." : "Enroll New Participant"}
@@ -232,9 +243,12 @@ export default function TrialDetailPage({ params }) {
 
         {trial.status !== "active" && (
           <p className="mt-2 text-sm text-gray-600">
-            {trial.status === "paused" && "Enrollment is paused. Resume to enroll new participants."}
-            {trial.status === "completed" && "Trial is completed. No new enrollments allowed."}
-            {trial.status === "draft" && "Trial is in draft mode. Activate to begin enrollment."}
+            {trial.status === "paused" &&
+              "Enrollment is paused. Resume to enroll new participants."}
+            {trial.status === "completed" &&
+              "Trial is completed. No new enrollments allowed."}
+            {trial.status === "draft" &&
+              "Trial is in draft mode. Activate to begin enrollment."}
           </p>
         )}
       </div>
@@ -244,7 +258,8 @@ export default function TrialDetailPage({ params }) {
         <div className="p-6 border-b">
           <h2 className="text-xl font-semibold">Participants</h2>
           <p className="text-sm text-gray-600 mt-1">
-            All participant data is blinded - treatment assignments are not visible
+            All participant data is blinded - treatment assignments are not
+            visible
           </p>
         </div>
 
@@ -266,7 +281,10 @@ export default function TrialDetailPage({ params }) {
             <tbody className="bg-white divide-y divide-gray-200">
               {participants.length === 0 ? (
                 <tr>
-                  <td colSpan="3" className="px-6 py-8 text-center text-gray-500">
+                  <td
+                    colSpan="3"
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
                     No participants enrolled yet
                   </td>
                 </tr>
@@ -277,16 +295,24 @@ export default function TrialDetailPage({ params }) {
                       {participant.participantCode}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(participant.enrollmentDate).toLocaleDateString()}
+                      {new Date(
+                        participant.enrollmentDate
+                      ).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        participant.status === "enrolled" ? "bg-blue-100 text-blue-800" :
-                        participant.status === "active" ? "bg-green-100 text-green-800" :
-                        participant.status === "completed" ? "bg-gray-100 text-gray-800" :
-                        "bg-red-100 text-red-800"
-                      }`}>
-                        {participant.status.charAt(0).toUpperCase() + participant.status.slice(1)}
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          participant.status === "enrolled"
+                            ? "bg-blue-100 text-blue-800"
+                            : participant.status === "active"
+                            ? "bg-green-100 text-green-800"
+                            : participant.status === "completed"
+                            ? "bg-gray-100 text-gray-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
+                        {participant.status.charAt(0).toUpperCase() +
+                          participant.status.slice(1)}
                       </span>
                     </td>
                   </tr>

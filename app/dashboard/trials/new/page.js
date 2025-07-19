@@ -19,7 +19,8 @@ export default function NewTrialPage() {
   const router = useRouter();
 
   function handleChange(e) {
-    const value = e.target.type === "number" ? parseInt(e.target.value) : e.target.value;
+    const value =
+      e.target.type === "number" ? parseInt(e.target.value) : e.target.value;
     setForm({ ...form, [e.target.name]: value });
   }
 
@@ -51,13 +52,13 @@ export default function NewTrialPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
-    
+
     // Ensure randomization ratio matches number of arms
     const finalForm = {
       ...form,
-      randomizationRatio: form.randomizationRatio.slice(0, form.arms.length)
+      randomizationRatio: form.randomizationRatio.slice(0, form.arms.length),
     };
-    
+
     const res = await fetch("/api/trials", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -168,7 +169,9 @@ export default function NewTrialPage() {
         )}
         {step === 2 && (
           <div>
-            <h3 className="text-lg font-semibold mb-4">Randomization Settings</h3>
+            <h3 className="text-lg font-semibold mb-4">
+              Randomization Settings
+            </h3>
             <div className="mb-4">
               <label className="block text-sm font-medium mb-2">
                 Randomization Ratio (must match number of arms)
@@ -176,7 +179,9 @@ export default function NewTrialPage() {
               <div className="space-y-2">
                 {form.arms.map((arm, i) => (
                   <div key={i} className="flex items-center space-x-2">
-                    <span className="w-24 text-sm">{arm.name || `Arm ${i + 1}`}:</span>
+                    <span className="w-24 text-sm">
+                      {arm.name || `Arm ${i + 1}`}:
+                    </span>
                     <input
                       type="number"
                       value={form.randomizationRatio[i] || 1}
@@ -189,7 +194,8 @@ export default function NewTrialPage() {
                 ))}
               </div>
               <p className="text-sm text-gray-600 mt-2">
-                Current ratio: {form.randomizationRatio.slice(0, form.arms.length).join(":")}
+                Current ratio:{" "}
+                {form.randomizationRatio.slice(0, form.arms.length).join(":")}
               </p>
             </div>
           </div>
@@ -209,7 +215,8 @@ export default function NewTrialPage() {
               <b>Target Enrollment:</b> {form.targetEnrollment} participants
             </div>
             <div className="mb-2">
-              <b>Randomization Ratio:</b> {form.randomizationRatio.slice(0, form.arms.length).join(":")}
+              <b>Randomization Ratio:</b>{" "}
+              {form.randomizationRatio.slice(0, form.arms.length).join(":")}
             </div>
             <div className="mb-2">
               <b>Arms:</b>

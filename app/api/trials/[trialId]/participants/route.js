@@ -9,15 +9,20 @@ import { NextRequest } from "next/server";
 function generateParticipantCode() {
   const prefix = "P";
   const timestamp = Date.now().toString().slice(-6);
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
+  const random = Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, "0");
   return `${prefix}${timestamp}${random}`;
 }
 
 // Helper function to perform randomization
 function randomizeParticipant(randomizationRatio) {
-  const totalWeight = randomizationRatio.reduce((sum, weight) => sum + weight, 0);
+  const totalWeight = randomizationRatio.reduce(
+    (sum, weight) => sum + weight,
+    0
+  );
   const random = Math.random() * totalWeight;
-  
+
   let cumulativeWeight = 0;
   for (let i = 0; i < randomizationRatio.length; i++) {
     cumulativeWeight += randomizationRatio[i];
@@ -25,7 +30,7 @@ function randomizeParticipant(randomizationRatio) {
       return i;
     }
   }
-  
+
   return 0; // Default to first group
 }
 
@@ -69,20 +74,24 @@ export async function POST(req, { params }) {
 
     // Check if trial is active for enrollment
     if (trial.status !== "active") {
-      return new Response("Trial is not active for enrollment", { status: 400 });
+      return new Response("Trial is not active for enrollment", {
+        status: 400,
+      });
     }
 
     // Check enrollment capacity
     const currentParticipants = await Participant.countDocuments({ trialId });
     if (currentParticipants >= trial.targetEnrollment) {
-      return new Response("Trial has reached target enrollment", { status: 400 });
+      return new Response("Trial has reached target enrollment", {
+        status: 400,
+      });
     }
 
     // Generate unique participant code
     let participantCode;
     let isUnique = false;
     let attempts = 0;
-    
+
     while (!isUnique && attempts < 10) {
       participantCode = generateParticipantCode();
       const existing = await Participant.findOne({ participantCode });
@@ -93,7 +102,9 @@ export async function POST(req, { params }) {
     }
 
     if (!isUnique) {
-      return new Response("Failed to generate unique participant code", { status: 500 });
+      return new Response("Failed to generate unique participant code", {
+        status: 500,
+      });
     }
 
     // Perform randomization
