@@ -9,6 +9,7 @@ export default function TrialDetailPage({ params }) {
   const router = useRouter();
   const [trial, setTrial] = useState(null);
   const [participants, setParticipants] = useState([]);
+  const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -46,6 +47,21 @@ export default function TrialDetailPage({ params }) {
     }
   };
 
+  // Fetch alerts data
+  const fetchAlerts = async () => {
+    try {
+      const response = await fetch(`/api/trials/${trialId}/alerts`);
+      if (response.ok) {
+        const data = await response.json();
+        setAlerts(data.alerts || []);
+      } else {
+        console.error("Failed to fetch alerts");
+      }
+    } catch (error) {
+      console.error("Error fetching alerts");
+    }
+  };
+
   // Load data on component mount
   useEffect(() => {
     if (status === "loading") return;
@@ -56,7 +72,7 @@ export default function TrialDetailPage({ params }) {
 
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchTrial(), fetchParticipants()]);
+      await Promise.all([fetchTrial(), fetchParticipants(), fetchAlerts()]);
       setLoading(false);
     };
 
@@ -196,7 +212,25 @@ export default function TrialDetailPage({ params }) {
 
       {/* Control Panel */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Enrollment Controls</h2>
+        <h2 className="text-xl font-semibold mb-4">Trial Management</h2>
+
+        {/* Navigation Buttons */}
+        <div className="flex gap-4 flex-wrap mb-6">
+          <button
+            onClick={() => router.push(`/dashboard/trials/${trialId}/reports`)}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors"
+          >
+            View Data Reports
+          </button>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded font-medium transition-colors"
+          >
+            Refresh Data
+          </button>
+        </div>
+
+        <h3 className="text-lg font-semibold mb-4">Enrollment Controls</h3>
 
         <div className="flex gap-4 flex-wrap">
           {/* Pause/Resume Button */}
@@ -253,6 +287,81 @@ export default function TrialDetailPage({ params }) {
         )}
       </div>
 
+      {/* Alerts Dashboard */}
+      <div className="bg-white rounded-lg shadow-md mb-6">
+        <div className="p-6 border-b">
+          <h2 className="text-xl font-semibold">Critical Alerts</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Recent alerts requiring attention (participant identities are
+            blinded)
+          </p>
+        </div>
+        <div className="p-6">
+          {alerts.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">No recent alerts</p>
+          ) : (
+            <div className="space-y-3">
+              {alerts.slice(0, 5).map((alert) => (
+                <div
+                  key={alert.id}
+                  className={`border rounded-lg p-4 ${
+                    alert.severity === "critical"
+                      ? "border-red-300 bg-red-50"
+                      : alert.severity === "high"
+                      ? "border-orange-300 bg-orange-50"
+                      : "border-yellow-300 bg-yellow-50"
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex gap-2">
+                      <span className="px-2 py-1 text-xs font-medium bg-white rounded border">
+                        {alert.type}
+                      </span>
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded ${
+                          alert.severity === "critical"
+                            ? "bg-red-200 text-red-800"
+                            : alert.severity === "high"
+                            ? "bg-orange-200 text-orange-800"
+                            : "bg-yellow-200 text-yellow-800"
+                        }`}
+                      >
+                        {alert.severity.toUpperCase()}
+                      </span>
+                      <button
+                        onClick={() =>
+                          router.push(
+                            `/dashboard/participants/${alert.participant.id}`
+                          )
+                        }
+                        className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
+                      >
+                        {alert.participant.code}
+                      </button>
+                    </div>
+                    <span className="text-xs text-gray-500">
+                      {new Date(alert.timestamp).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="mt-2 text-sm text-gray-700">
+                    <pre className="whitespace-pre-wrap text-xs">
+                      {JSON.stringify(alert.payload, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              ))}
+              {alerts.length > 5 && (
+                <div className="text-center pt-4">
+                  <p className="text-sm text-gray-600">
+                    Showing 5 of {alerts.length} alerts
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Participants Table */}
       <div className="bg-white rounded-lg shadow-md">
         <div className="p-6 border-b">
@@ -291,8 +400,17 @@ export default function TrialDetailPage({ params }) {
               ) : (
                 participants.map((participant) => (
                   <tr key={participant._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {participant.participantCode}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button
+                        onClick={() =>
+                          router.push(
+                            `/dashboard/participants/${participant._id}`
+                          )
+                        }
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                      >
+                        {participant.participantCode}
+                      </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(
