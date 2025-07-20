@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "../../../../../lib/dbConnect";
 import DataPoint from "../../../../../models/DataPoint";
+import Participant from "../../../../../models/Participant";
 import Trial from "../../../../../models/Trial";
 
 export async function GET(request, { params }) {
@@ -118,6 +119,40 @@ export async function GET(request, { params }) {
       { $sort: { count: -1 } },
     ]);
 
+    // Enrollment over time aggregation
+    const enrollmentOverTime = await Participant.aggregate([
+      { $match: { trialId: trial._id } },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$enrollmentDate",
+            },
+          },
+          dailyEnrollment: { $sum: 1 },
+        },
+      },
+      {
+        $project: {
+          date: "$_id",
+          dailyEnrollment: 1,
+          _id: 0,
+        },
+      },
+      { $sort: { date: 1 } },
+    ]);
+
+    // Calculate cumulative enrollment
+    let cumulativeTotal = 0;
+    const enrollmentData = enrollmentOverTime.map((item) => {
+      cumulativeTotal += item.dailyEnrollment;
+      return {
+        ...item,
+        cumulativeEnrollment: cumulativeTotal,
+      };
+    });
+
     // Total statistics
     const totalStats = await DataPoint.aggregate([
       { $match: { trialId: trial._id } },
@@ -146,6 +181,7 @@ export async function GET(request, { params }) {
         bySeverity: severityAggregation,
         dailyActivity,
         alerts: alertAggregation,
+        enrollmentOverTime: enrollmentData,
         totalStats: totalStats[0] || {
           totalDataPoints: 0,
           totalAlerts: 0,

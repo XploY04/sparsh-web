@@ -1,28 +1,35 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import {
-  Eye,
-  AlertTriangle,
-  Search,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  Clock,
-  User,
-  FileText,
-} from "lucide-react";
+  ClockIcon,
+  MagnifyingGlassIcon,
+  FunnelIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ArrowDownTrayIcon,
+  UserIcon,
+  DocumentTextIcon,
+  ExclamationTriangleIcon,
+} from "@heroicons/react/24/outline";
+
+import Card from "../../components/ui/Card";
+import Button from "../../components/ui/Button";
+import Input from "../../components/ui/Input";
+import Badge from "../../components/ui/Badge";
+import Table from "../../components/ui/Table";
+import { LoadingSkeletons } from "../../components/ui/LoadingStates";
+import { showToast } from "../../components/ui/Toast";
 
 export default function AuditLogPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [pagination, setPagination] = useState({});
+  const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
     action: "",
     userId: "",
@@ -46,421 +53,412 @@ export default function AuditLogPage() {
 
   const fetchAuditLogs = async () => {
     setLoading(true);
-    setError("");
 
     try {
-      const searchParams = new URLSearchParams();
+      const queryParams = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
         if (value) {
-          searchParams.append(key, value);
+          queryParams.append(key, value);
         }
       });
 
-      const response = await fetch(`/api/audit-log?${searchParams.toString()}`);
+      const response = await fetch(`/api/audit-log?${queryParams}`);
 
       if (response.ok) {
         const data = await response.json();
-        setLogs(data.logs);
-        setPagination(data.pagination);
+        setLogs(data.logs || []);
+        setPagination(data.pagination || {});
       } else {
-        const errorData = await response.json();
-        setError(errorData.error || "Failed to fetch audit logs");
+        throw new Error("Failed to fetch audit logs");
       }
     } catch (error) {
-      setError("Error fetching audit logs");
-      console.error("Error:", error);
+      showToast.error("Failed to load audit logs");
+      console.error("Error fetching audit logs:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value,
-      page: 1, // Reset to first page when filtering
-    }));
-  };
-
-  const handlePageChange = (newPage) => {
-    setFilters((prev) => ({
-      ...prev,
-      page: newPage,
-    }));
-  };
-
-  const getActionIcon = (action) => {
-    switch (action) {
-      case "participant_unblinded":
-      case "trial_unblinded":
-        return <Eye className="h-4 w-4 text-red-600" />;
-      case "trial_created":
-      case "trial_updated":
-        return <FileText className="h-4 w-4 text-blue-600" />;
-      case "participant_enrolled":
-        return <User className="h-4 w-4 text-green-600" />;
-      default:
-        return <Clock className="h-4 w-4 text-gray-600" />;
-    }
-  };
-
-  const getActionColor = (action) => {
-    if (action.includes("unblinded")) return "bg-red-50 border-red-200";
-    if (action.includes("created")) return "bg-green-50 border-green-200";
-    if (action.includes("updated")) return "bg-blue-50 border-blue-200";
-    return "bg-gray-50 border-gray-200";
-  };
-
-  const formatActionName = (action) => {
-    return action
-      .split("_")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
-  };
-
-  const exportLogs = async () => {
+  const exportAuditLogs = async () => {
     try {
-      const searchParams = new URLSearchParams();
+      const queryParams = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
         if (value && key !== "page" && key !== "limit") {
-          searchParams.append(key, value);
+          queryParams.append(key, value);
         }
       });
-      searchParams.append("limit", "1000"); // Get more records for export
 
-      const response = await fetch(`/api/audit-log?${searchParams.toString()}`);
+      const response = await fetch(`/api/audit-log/export?${queryParams}`);
 
       if (response.ok) {
-        const data = await response.json();
-
-        // Create CSV content
-        const headers = [
-          "Timestamp",
-          "User",
-          "Action",
-          "Trial",
-          "Participant",
-          "Details",
-          "IP Address",
-        ];
-        const csvContent = [
-          headers.join(","),
-          ...data.logs.map((log) =>
-            [
-              `"${new Date(log.timestamp).toISOString()}"`,
-              `"${log.user.email}"`,
-              `"${formatActionName(log.action)}"`,
-              `"${log.trial?.title || ""}"`,
-              `"${log.participant?.code || ""}"`,
-              `"${JSON.stringify(log.details).replace(/"/g, '""')}"`,
-              `"${log.ipAddress || ""}"`,
-            ].join(",")
-          ),
-        ].join("\n");
-
-        // Download file
-        const blob = new Blob([csvContent], { type: "text/csv" });
+        const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
         a.download = `audit-log-${new Date().toISOString().split("T")[0]}.csv`;
         document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        showToast.success("Audit log exported successfully");
+      } else {
+        throw new Error("Failed to export audit logs");
       }
     } catch (error) {
-      alert("Error exporting logs");
+      showToast.error("Failed to export audit logs");
     }
   };
 
-  if (status === "loading" || loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-xl">Loading audit logs...</div>
-      </div>
-    );
+  const updateFilters = (newFilters) => {
+    setFilters({ ...filters, ...newFilters, page: 1 });
+  };
+
+  const resetFilters = () => {
+    setFilters({
+      action: "",
+      userId: "",
+      trialId: "",
+      participantId: "",
+      startDate: "",
+      endDate: "",
+      page: 1,
+      limit: 25,
+    });
+  };
+
+  const changePage = (newPage) => {
+    setFilters({ ...filters, page: newPage });
+  };
+
+  if (status === "loading") {
+    return <LoadingSkeletons.Table />;
   }
 
   if (!session) {
+    router.push("/login");
     return null;
   }
 
-  return (
-    <div className="container mx-auto p-6">
-      {/* Header */}
-      <div className="mb-6">
-        <button
-          onClick={() => router.push("/dashboard")}
-          className="text-blue-600 hover:underline mb-4"
-        >
-          ← Back to Dashboard
-        </button>
+  const getActionBadgeVariant = (action) => {
+    const dangerActions = ["unblind", "delete", "emergency"];
+    const warningActions = ["update", "modify", "change"];
+    const successActions = ["create", "add", "enroll"];
 
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">
-              Audit Trail
-            </h1>
-            <p className="text-gray-600">
-              Complete record of all critical system actions
-            </p>
+    if (
+      dangerActions.some((keyword) => action.toLowerCase().includes(keyword))
+    ) {
+      return "danger";
+    }
+    if (
+      warningActions.some((keyword) => action.toLowerCase().includes(keyword))
+    ) {
+      return "warning";
+    }
+    if (
+      successActions.some((keyword) => action.toLowerCase().includes(keyword))
+    ) {
+      return "success";
+    }
+    return "info";
+  };
+
+  const auditColumns = [
+    {
+      key: "timestamp",
+      label: "Timestamp",
+      render: (value) => (
+        <div className="text-sm">
+          <div className="font-medium text-neutral-900">
+            {new Date(value).toLocaleDateString()}
           </div>
-
-          <button
-            onClick={exportLogs}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
-          >
-            <Download className="h-4 w-4" />
-            Export CSV
-          </button>
+          <div className="text-neutral-500">
+            {new Date(value).toLocaleTimeString()}
+          </div>
         </div>
-      </div>
+      ),
+    },
+    {
+      key: "action",
+      label: "Action",
+      render: (value) => (
+        <Badge variant={getActionBadgeVariant(value)}>{value}</Badge>
+      ),
+    },
+    {
+      key: "userId",
+      label: "User",
+      render: (value, log) => (
+        <div className="flex items-center gap-2">
+          <UserIcon className="w-4 h-4 text-neutral-400" />
+          <span className="text-sm font-medium">{log.userEmail || value}</span>
+        </div>
+      ),
+    },
+    {
+      key: "resource",
+      label: "Resource",
+      render: (value) => (
+        <span className="text-sm font-mono text-neutral-600">{value}</span>
+      ),
+    },
+    {
+      key: "details",
+      label: "Details",
+      render: (value) => (
+        <div className="max-w-xs">
+          <p className="text-sm text-neutral-600 truncate" title={value}>
+            {value}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "ipAddress",
+      label: "IP Address",
+      render: (value) => (
+        <span className="text-xs font-mono text-neutral-500">{value}</span>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
+      >
+        <div>
+          <h1 className="text-3xl font-bold text-neutral-900">Audit Trail</h1>
+          <p className="text-neutral-600 mt-1">
+            Complete log of all system activities and security events
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="secondary"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <FunnelIcon className="w-4 h-4" />
+            Filters
+          </Button>
+          <Button variant="primary" onClick={exportAuditLogs}>
+            <ArrowDownTrayIcon className="w-4 h-4" />
+            Export
+          </Button>
+        </div>
+      </motion.div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Filter className="h-5 w-5" />
-          Filters
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Action Type
-            </label>
-            <select
-              value={filters.action}
-              onChange={(e) => handleFilterChange("action", e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">All Actions</option>
-              <option value="trial_created">Trial Created</option>
-              <option value="trial_updated">Trial Updated</option>
-              <option value="trial_unblinded">Trial Unblinded</option>
-              <option value="participant_enrolled">Participant Enrolled</option>
-              <option value="participant_unblinded">
-                Participant Unblinded
-              </option>
-              <option value="participant_withdrawn">
-                Participant Withdrawn
-              </option>
-              <option value="data_export">Data Export</option>
-              <option value="admin_login">Admin Login</option>
-              <option value="user_created">User Created</option>
-              <option value="user_updated">User Updated</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Start Date
-            </label>
-            <input
-              type="date"
-              value={filters.startDate}
-              onChange={(e) => handleFilterChange("startDate", e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              End Date
-            </label>
-            <input
-              type="date"
-              value={filters.endDate}
-              onChange={(e) => handleFilterChange("endDate", e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Records per page
-            </label>
-            <select
-              value={filters.limit}
-              onChange={(e) =>
-                handleFilterChange("limit", parseInt(e.target.value))
-              }
-              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-          </div>
-
-          <div className="flex items-end">
-            <button
-              onClick={() =>
-                setFilters({
-                  action: "",
-                  userId: "",
-                  trialId: "",
-                  participantId: "",
-                  startDate: "",
-                  endDate: "",
-                  page: 1,
-                  limit: 25,
-                })
-              }
-              className="w-full px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
-            >
-              Clear Filters
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Error Display */}
-      {error && (
-        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-          {error}
-        </div>
+      {showFilters && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+        >
+          <Card>
+            <h3 className="text-lg font-semibold text-neutral-900 mb-4">
+              Filter Audit Logs
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Input
+                label="Action"
+                value={filters.action}
+                onChange={(e) => updateFilters({ action: e.target.value })}
+                placeholder="e.g., unblind, create"
+              />
+              <Input
+                label="User ID"
+                value={filters.userId}
+                onChange={(e) => updateFilters({ userId: e.target.value })}
+                placeholder="User identifier"
+              />
+              <Input
+                label="Trial ID"
+                value={filters.trialId}
+                onChange={(e) => updateFilters({ trialId: e.target.value })}
+                placeholder="Trial identifier"
+              />
+              <Input
+                label="Participant ID"
+                value={filters.participantId}
+                onChange={(e) =>
+                  updateFilters({ participantId: e.target.value })
+                }
+                placeholder="Participant identifier"
+              />
+              <Input
+                type="date"
+                label="Start Date"
+                value={filters.startDate}
+                onChange={(e) => updateFilters({ startDate: e.target.value })}
+              />
+              <Input
+                type="date"
+                label="End Date"
+                value={filters.endDate}
+                onChange={(e) => updateFilters({ endDate: e.target.value })}
+              />
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button variant="primary" onClick={fetchAuditLogs}>
+                Apply Filters
+              </Button>
+              <Button variant="secondary" onClick={resetFilters}>
+                Reset
+              </Button>
+            </div>
+          </Card>
+        </motion.div>
       )}
 
-      {/* Logs Table */}
-      <div className="bg-white rounded-lg shadow-md">
-        <div className="p-6 border-b">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Audit Log Entries</h2>
-            <p className="text-sm text-gray-600">
-              Showing {logs.length} of {pagination.totalCount} entries
-            </p>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Timestamp
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  User
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Action
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Context
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Details
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  IP Address
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {logs.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-6 py-8 text-center text-gray-500"
-                  >
-                    No audit log entries found matching your criteria
-                  </td>
-                </tr>
-              ) : (
-                logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(log.timestamp).toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {log.user.name || "Unknown"}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {log.user.email}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div
-                        className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border ${getActionColor(
-                          log.action
-                        )}`}
-                      >
-                        {getActionIcon(log.action)}
-                        <span className="text-sm font-medium">
-                          {formatActionName(log.action)}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {log.trial && (
-                        <div className="mb-1">
-                          <span className="font-medium">Trial:</span>{" "}
-                          {log.trial.title}
-                        </div>
-                      )}
-                      {log.participant && (
-                        <div>
-                          <span className="font-medium">Participant:</span>{" "}
-                          {log.participant.code}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      <div className="max-w-xs truncate">
-                        {typeof log.details === "object" ? (
-                          <details className="cursor-pointer">
-                            <summary className="hover:text-gray-700">
-                              View details...
-                            </summary>
-                            <pre className="mt-2 text-xs bg-gray-100 p-2 rounded whitespace-pre-wrap">
-                              {JSON.stringify(log.details, null, 2)}
-                            </pre>
-                          </details>
-                        ) : (
-                          log.details
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {log.ipAddress || "N/A"}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {pagination.totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-gray-200">
+      {/* Summary Stats */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card padding="default">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-700">
-                Page {pagination.page} of {pagination.totalPages}
+              <div>
+                <p className="text-sm font-medium text-neutral-600">
+                  Total Events
+                </p>
+                <p className="text-2xl font-bold text-neutral-900">
+                  {pagination.totalItems || 0}
+                </p>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handlePageChange(pagination.page - 1)}
-                  disabled={!pagination.hasPrev}
-                  className="px-3 py-1 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => handlePageChange(pagination.page + 1)}
-                  disabled={!pagination.hasNext}
-                  className="px-3 py-1 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
+              <ClockIcon className="w-8 h-8 text-neutral-400" />
+            </div>
+          </Card>
+          <Card padding="default">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-neutral-600">
+                  Today's Events
+                </p>
+                <p className="text-2xl font-bold text-neutral-900">
+                  {
+                    logs.filter(
+                      (log) =>
+                        new Date(log.timestamp).toDateString() ===
+                        new Date().toDateString()
+                    ).length
+                  }
+                </p>
               </div>
+              <DocumentTextIcon className="w-8 h-8 text-neutral-400" />
+            </div>
+          </Card>
+          <Card padding="default">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-neutral-600">
+                  Critical Actions
+                </p>
+                <p className="text-2xl font-bold text-danger-600">
+                  {
+                    logs.filter(
+                      (log) =>
+                        log.action.toLowerCase().includes("unblind") ||
+                        log.action.toLowerCase().includes("emergency")
+                    ).length
+                  }
+                </p>
+              </div>
+              <ExclamationTriangleIcon className="w-8 h-8 text-danger-400" />
+            </div>
+          </Card>
+          <Card padding="default">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-neutral-600">
+                  Unique Users
+                </p>
+                <p className="text-2xl font-bold text-neutral-900">
+                  {new Set(logs.map((log) => log.userId)).size}
+                </p>
+              </div>
+              <UserIcon className="w-8 h-8 text-neutral-400" />
+            </div>
+          </Card>
+        </div>
+      </motion.div>
+
+      {/* Audit Logs Table */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <Card>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-neutral-900">
+              Audit Events
+            </h2>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-neutral-600">
+                Showing {(pagination.currentPage - 1) * pagination.limit + 1} -{" "}
+                {Math.min(
+                  pagination.currentPage * pagination.limit,
+                  pagination.totalItems
+                )}{" "}
+                of {pagination.totalItems}
+              </span>
             </div>
           </div>
-        )}
-      </div>
+
+          <Table
+            data={logs}
+            columns={auditColumns}
+            loading={loading}
+            emptyState={
+              <div className="text-center py-12">
+                <ClockIcon className="mx-auto h-12 w-12 text-neutral-400 mb-4" />
+                <h3 className="text-lg font-semibold text-neutral-900 mb-2">
+                  No Audit Logs
+                </h3>
+                <p className="text-neutral-500">
+                  No audit events match your current filters.
+                </p>
+              </div>
+            }
+          />
+
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6 pt-6 border-t border-neutral-200">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => changePage(pagination.currentPage - 1)}
+                  disabled={pagination.currentPage <= 1}
+                >
+                  <ChevronLeftIcon className="w-4 h-4" />
+                  Previous
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => changePage(pagination.currentPage + 1)}
+                  disabled={pagination.currentPage >= pagination.totalPages}
+                >
+                  Next
+                  <ChevronRightIcon className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-neutral-600">
+                  Page {pagination.currentPage} of {pagination.totalPages}
+                </span>
+              </div>
+            </div>
+          )}
+        </Card>
+      </motion.div>
     </div>
   );
 }

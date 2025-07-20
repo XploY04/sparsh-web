@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import ExportButton from "../../components/ExportButton";
+import MetricCard from "../../../components/MetricCard";
+import ProgressBar from "../../components/ProgressBar";
 import {
   BarChart,
   Bar,
@@ -96,8 +99,14 @@ export default function TrialReportsPage({ params }) {
     );
   }
 
-  const { totalStats, byType, bySeverity, dailyActivity, alerts } =
-    aggregatedData || {};
+  const {
+    totalStats,
+    byType,
+    bySeverity,
+    dailyActivity,
+    alerts,
+    enrollmentOverTime,
+  } = aggregatedData || {};
 
   return (
     <div className="container mx-auto p-6">
@@ -112,54 +121,127 @@ export default function TrialReportsPage({ params }) {
         <h1 className="text-3xl font-bold text-gray-800 mb-2">
           Data Reports: {trial?.title}
         </h1>
-        <p className="text-gray-600">
+        <p className="text-gray-600 mb-4">
           Aggregated trial data visualization (blinded analysis)
         </p>
+
+        {/* Export Buttons */}
+        <div className="flex gap-4 mb-4">
+          <ExportButton
+            trialId={trialId}
+            isBlinded={true}
+            label="📊 Export Blinded Data"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium"
+          />
+          <ExportButton
+            trialId={trialId}
+            isBlinded={false}
+            isEnabled={trial?.isUnblinded}
+            label="🔓 Export Unblinded Data"
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-medium"
+            disabledMessage="Trial not unblinded"
+          />
+        </div>
+
+        {trial?.isUnblinded && (
+          <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
+            <p className="text-yellow-800 text-sm">
+              ⚠️ <strong>Trial Unblinded:</strong> Unblinded data export is now
+              available. Unblinded on{" "}
+              {new Date(trial.unblindedAt).toLocaleDateString()}.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow-md">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+        <MetricCard
+          title="Total Data Points"
+          value={totalStats?.totalDataPoints || 0}
+          icon="📊"
+          color="blue"
+        />
+        <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
           <h3 className="text-lg font-semibold text-gray-700 mb-2">
-            Total Data Points
+            Participants
           </h3>
-          <p className="text-3xl font-bold text-blue-600">
-            {totalStats?.totalDataPoints || 0}
-          </p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">
-            Active Participants
-          </h3>
-          <p className="text-3xl font-bold text-green-600">
+          <p className="text-3xl font-bold text-green-600 mb-2">
             {totalStats?.uniqueParticipantCount || 0}
           </p>
+          <ProgressBar
+            current={totalStats?.uniqueParticipantCount || 0}
+            target={trial?.targetEnrollment || 100}
+            label="Enrollment Progress"
+            color="green"
+          />
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">
-            Total Alerts
-          </h3>
-          <p className="text-3xl font-bold text-red-600">
-            {totalStats?.totalAlerts || 0}
-          </p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">
-            Alert Rate
-          </h3>
-          <p className="text-3xl font-bold text-yellow-600">
-            {totalStats?.totalDataPoints > 0
+        <MetricCard
+          title="Enrollment Progress"
+          value={
+            trial?.targetEnrollment > 0
+              ? `${Math.round(
+                  ((totalStats?.uniqueParticipantCount || 0) /
+                    trial.targetEnrollment) *
+                    100
+                )}%`
+              : "0%"
+          }
+          subtitle="of target reached"
+          icon="🎯"
+          color="purple"
+        />
+        <MetricCard
+          title="Total Alerts"
+          value={totalStats?.totalAlerts || 0}
+          icon="🚨"
+          color="red"
+        />
+        <MetricCard
+          title="Alert Rate"
+          value={
+            totalStats?.totalDataPoints > 0
               ? `${(
                   (totalStats.totalAlerts / totalStats.totalDataPoints) *
                   100
                 ).toFixed(1)}%`
-              : "0%"}
-          </p>
-        </div>
+              : "0%"
+          }
+          icon="⚠️"
+          color="yellow"
+        />
       </div>
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Enrollment Over Time Chart */}
+        <div className="bg-white p-6 rounded-lg shadow-md lg:col-span-2">
+          <h3 className="text-xl font-semibold mb-4">Enrollment Over Time</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={enrollmentOverTime || []}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="dailyEnrollment"
+                stroke="#10b981"
+                name="Daily Enrollment"
+                strokeWidth={2}
+              />
+              <Line
+                type="monotone"
+                dataKey="cumulativeEnrollment"
+                stroke="#3b82f6"
+                name="Cumulative Enrollment"
+                strokeWidth={3}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
         {/* Data Types Chart */}
         <div className="bg-white p-6 rounded-lg shadow-md">
           <h3 className="text-xl font-semibold mb-4">
@@ -252,7 +334,7 @@ export default function TrialReportsPage({ params }) {
       </div>
 
       {/* Navigation */}
-      <div className="mt-8 flex gap-4">
+      <div className="mt-8 flex gap-4 flex-wrap">
         <button
           onClick={() => router.push(`/dashboard/trials/${trialId}`)}
           className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded font-medium transition-colors"
@@ -260,8 +342,14 @@ export default function TrialReportsPage({ params }) {
           Back to Trial
         </button>
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => router.push("/dashboard")}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors"
+        >
+          Dashboard Home
+        </button>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors"
         >
           Refresh Data
         </button>
