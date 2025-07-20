@@ -27,6 +27,12 @@ export default function DashboardPage() {
         </h1>
         <div className="flex gap-4">
           <button
+            onClick={() => router.push("/dashboard/audit-log")}
+            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded transition-colors"
+          >
+            Audit Trail
+          </button>
+          <button
             onClick={() => router.push("/dashboard/trials/new")}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors"
           >

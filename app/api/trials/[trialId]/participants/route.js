@@ -4,6 +4,10 @@ import dbConnect from "../../../../../lib/dbConnect";
 import Participant from "../../../../../models/Participant";
 import Trial from "../../../../../models/Trial";
 import { NextRequest } from "next/server";
+import {
+  logAction,
+  extractRequestMetadata,
+} from "../../../../../lib/auditLogger";
 
 // Helper function to generate unique participant code
 function generateParticipantCode() {
@@ -119,6 +123,26 @@ export async function POST(req, { params }) {
     });
 
     await participant.save();
+
+    // Log participant enrollment
+    const metadata = extractRequestMetadata(req);
+    await logAction(
+      session.user.id,
+      "participant_enrolled",
+      {
+        participantId: participant._id,
+        participantCode: participant.participantCode,
+        trialId: trial._id,
+        trialTitle: trial.title,
+        assignedGroup: assignedGroup, // This is logged but not returned to UI
+        enrollmentDate: participant.enrollmentDate,
+      },
+      {
+        ...metadata,
+        trialId: trial._id,
+        participantId: participant._id,
+      }
+    );
 
     // Return participant data without assignedGroup
     const responseData = {

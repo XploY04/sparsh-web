@@ -23,6 +23,17 @@ const TrialSchema = new mongoose.Schema(
       type: Number,
       default: 100,
     },
+    isUnblinded: {
+      type: Boolean,
+      default: false,
+    },
+    unblindedAt: {
+      type: Date,
+    },
+    unblindedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
   },
   { timestamps: true }
 );

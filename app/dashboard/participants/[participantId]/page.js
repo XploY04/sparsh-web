@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { AlertTriangle, Eye, Calendar, Activity } from "lucide-react";
+import UnblindConfirmationModal from "../../components/UnblindConfirmationModal";
 
 export default function ParticipantTimelinePage({ params }) {
   const { data: session, status } = useSession();
@@ -14,6 +16,8 @@ export default function ParticipantTimelinePage({ params }) {
   const [error, setError] = useState("");
   const [submittingMockData, setSubmittingMockData] = useState(false);
   const [mockDataType, setMockDataType] = useState("SymptomReport");
+  const [showUnblindModal, setShowUnblindModal] = useState(false);
+  const [unblindResult, setUnblindResult] = useState(null);
 
   const participantId = params.participantId;
 
@@ -123,6 +127,40 @@ export default function ParticipantTimelinePage({ params }) {
     }
   };
 
+  const handleEmergencyUnblind = async (reason, confirmationText) => {
+    try {
+      const response = await fetch(
+        `/api/participants/${participantId}/unblind`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            reason,
+            confirmationText,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setUnblindResult(data);
+        setParticipant((prev) => ({
+          ...prev,
+          isUnblinded: true,
+        }));
+        setShowUnblindModal(false);
+      } else {
+        throw new Error(data.error || "Failed to unblind participant");
+      }
+    } catch (error) {
+      alert(`Error: ${error.message}`);
+      throw error;
+    }
+  };
+
   const getSeverityColor = (severity) => {
     switch (severity) {
       case "critical":
@@ -191,6 +229,94 @@ export default function ParticipantTimelinePage({ params }) {
           </div>
         </div>
       </div>
+
+      {/* Participant Info & Actions */}
+      {participant && (
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="flex justify-between items-start">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1">
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">
+                  Participant Code
+                </h3>
+                <p className="text-lg font-semibold">
+                  {participant.participantCode}
+                </p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">
+                  Status
+                </h3>
+                <span
+                  className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                    participant.status === "active"
+                      ? "bg-green-100 text-green-800"
+                      : participant.status === "completed"
+                      ? "bg-blue-100 text-blue-800"
+                      : participant.status === "withdrawn"
+                      ? "bg-red-100 text-red-800"
+                      : "bg-gray-100 text-gray-800"
+                  }`}
+                >
+                  {participant.status}
+                </span>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">
+                  Enrollment Date
+                </h3>
+                <p className="text-lg">
+                  {new Date(participant.enrollmentDate).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+
+            <div className="ml-6 space-y-3">
+              {/* Unblinding Status */}
+              <div className="text-right">
+                {participant.isUnblinded ? (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-red-800">
+                      <Eye className="h-4 w-4" />
+                      <span className="font-medium">UNBLINDED</span>
+                    </div>
+                    {unblindResult && (
+                      <div className="mt-2 text-sm">
+                        <p>
+                          <strong>Group:</strong>{" "}
+                          {unblindResult.participant.assignedGroup}
+                        </p>
+                        <p>
+                          <strong>Treatment:</strong>{" "}
+                          {unblindResult.participant.treatmentAssignment}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <Eye className="h-4 w-4" />
+                      <span className="font-medium">BLINDED</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Emergency Unblind Button */}
+              {!participant.isUnblinded && (
+                <button
+                  onClick={() => setShowUnblindModal(true)}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  Emergency Unblind
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Summary Cards */}
       {summary && (
@@ -333,6 +459,15 @@ export default function ParticipantTimelinePage({ params }) {
           ))
         )}
       </div>
+
+      {/* Unblind Confirmation Modal */}
+      <UnblindConfirmationModal
+        isOpen={showUnblindModal}
+        onClose={() => setShowUnblindModal(false)}
+        onConfirm={handleEmergencyUnblind}
+        participantCode={participant?.participantCode}
+        type="participant"
+      />
     </div>
   );
 }

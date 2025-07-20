@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { AlertTriangle, Eye, Lock, Users, Activity } from "lucide-react";
+import UnblindConfirmationModal from "../../components/UnblindConfirmationModal";
 
 export default function TrialDetailPage({ params }) {
   const { data: session, status } = useSession();
@@ -14,6 +16,8 @@ export default function TrialDetailPage({ params }) {
   const [enrolling, setEnrolling] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [error, setError] = useState("");
+  const [showUnblindModal, setShowUnblindModal] = useState(false);
+  const [unblindResult, setUnblindResult] = useState(null);
 
   const trialId = params.trialId;
 
@@ -129,6 +133,40 @@ export default function TrialDetailPage({ params }) {
       setError("Error updating trial status");
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const handleStudyUnblind = async (reason, confirmationText) => {
+    try {
+      const response = await fetch(`/api/trials/${trialId}/unblind`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          reason,
+          confirmationText,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setUnblindResult(data);
+        setTrial((prev) => ({
+          ...prev,
+          isUnblinded: true,
+          unblindedAt: data.trial.unblindedAt,
+        }));
+        setShowUnblindModal(false);
+        await fetchTrial(); // Refresh trial data
+        await fetchParticipants(); // Refresh participants to show updated status
+      } else {
+        throw new Error(data.error || "Failed to unblind study");
+      }
+    } catch (error) {
+      alert(`Error: ${error.message}`);
+      throw error;
     }
   };
 
@@ -287,6 +325,103 @@ export default function TrialDetailPage({ params }) {
         )}
       </div>
 
+      {/* Admin Actions */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Lock className="h-5 w-5" />
+          Administrative Actions
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Study Status */}
+          <div className="space-y-3">
+            <h3 className="font-medium text-gray-700">Study Blinding Status</h3>
+            {trial.isUnblinded ? (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-red-800 mb-2">
+                  <Eye className="h-4 w-4" />
+                  <span className="font-medium">STUDY UNBLINDED</span>
+                </div>
+                <p className="text-sm text-red-700">
+                  Unblinded on:{" "}
+                  {new Date(
+                    trial.unblindedAt || trial.updatedAt
+                  ).toLocaleString()}
+                </p>
+                {unblindResult && (
+                  <div className="mt-3">
+                    <p className="text-sm font-medium text-red-800">
+                      Treatment Mapping:
+                    </p>
+                    <div className="mt-1 space-y-1">
+                      {unblindResult.treatmentMapping.map((mapping) => (
+                        <p key={mapping.group} className="text-xs text-red-700">
+                          Group {mapping.group}: {mapping.name}{" "}
+                          {mapping.description && `(${mapping.description})`}
+                        </p>
+                      ))}
+                    </div>
+                    <p className="text-xs text-red-700 mt-2">
+                      {unblindResult.participants.newlyUnblinded} of{" "}
+                      {unblindResult.participants.total} participants newly
+                      unblinded
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-gray-600 mb-2">
+                  <Lock className="h-4 w-4" />
+                  <span className="font-medium">STUDY BLINDED</span>
+                </div>
+                <p className="text-sm text-gray-600">
+                  Treatment assignments are concealed
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Unblind Actions */}
+          <div className="space-y-3">
+            <h3 className="font-medium text-gray-700">Emergency Actions</h3>
+            {!trial.isUnblinded ? (
+              <button
+                onClick={() => setShowUnblindModal(true)}
+                disabled={trial.status === "draft"}
+                className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white px-4 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors disabled:cursor-not-allowed"
+              >
+                <AlertTriangle className="h-4 w-4" />
+                Unlock Final Results
+              </button>
+            ) : (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <p className="text-sm text-green-800 font-medium">
+                  ✓ Final results have been unlocked
+                </p>
+                <p className="text-xs text-green-700 mt-1">
+                  All treatment assignments are now visible
+                </p>
+              </div>
+            )}
+
+            {trial.status === "draft" && (
+              <p className="text-xs text-gray-500">
+                Draft trials cannot be unblinded. Activate the trial first.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <p className="text-xs text-gray-500 italic">
+            ⚠️ Emergency unblinding actions are permanently logged and cannot be
+            undone. Use only when medically necessary or for final study
+            analysis.
+          </p>
+        </div>
+      </div>
+
       {/* Alerts Dashboard */}
       <div className="bg-white rounded-lg shadow-md mb-6">
         <div className="p-6 border-b">
@@ -440,6 +575,15 @@ export default function TrialDetailPage({ params }) {
           </table>
         </div>
       </div>
+
+      {/* Unblind Confirmation Modal */}
+      <UnblindConfirmationModal
+        isOpen={showUnblindModal}
+        onClose={() => setShowUnblindModal(false)}
+        onConfirm={handleStudyUnblind}
+        trialTitle={trial?.title}
+        type="trial"
+      />
     </div>
   );
 }
