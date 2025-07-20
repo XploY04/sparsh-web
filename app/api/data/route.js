@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import dbConnect from "../../lib/dbConnect";
-import DataPoint from "../../models/DataPoint";
-import Participant from "../../models/Participant";
+import dbConnect from "../../../lib/dbConnect";
+import DataPoint from "../../../models/DataPoint";
+import Participant from "../../../models/Participant";
 
 export async function POST(request) {
   try {

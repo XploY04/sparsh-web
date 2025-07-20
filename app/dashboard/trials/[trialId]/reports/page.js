@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import ExportButton from "../../components/ExportButton";
+import ExportButton from "../../../components/ExportButton";
 import MetricCard from "../../../components/MetricCard";
-import ProgressBar from "../../components/ProgressBar";
+import ProgressBar from "../../../components/ProgressBar";
 import {
   BarChart,
   Bar,
